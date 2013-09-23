@@ -9,7 +9,7 @@
 #import "cocos2d.h"
 
 #import "AppDelegate.h"
-#import "IntroLayer.h"
+#import "GameLayer.h"
 
 @implementation AppController
 
@@ -35,10 +35,10 @@
 	director_.wantsFullScreenLayout = YES;
 
 	// Display FSP and SPF
-	[director_ setDisplayStats:YES];
+	[director_ setDisplayStats:NO];
 
 	// set FPS at 60
-	[director_ setAnimationInterval:1.0/60];
+	[director_ setAnimationInterval:1.0/30];
 
 	// attach the openglView to the director
 	[director_ setView:glView];
@@ -73,7 +73,7 @@
 	[CCTexture2D PVRImagesHavePremultipliedAlpha:YES];
 
 	// and add the scene to the stack. The director will run it when it automatically when the view is displayed.
-	[director_ pushScene: [IntroLayer scene]]; 
+	[director_ pushScene: [GameLayer scene]];
 
 	
 	// Create a Navigation Controller with the Director
@@ -141,12 +141,5 @@
 	[[CCDirector sharedDirector] setNextDeltaTimeZero:YES];
 }
 
-- (void) dealloc
-{
-	[window_ release];
-	[navController_ release];
-
-	[super dealloc];
-}
 @end
 
