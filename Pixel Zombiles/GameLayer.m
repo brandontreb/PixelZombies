@@ -17,13 +17,14 @@
 #import "Soldier.h"
 #import "GameOverLayer.h"
 
-#define kMaxZombieSpeed 1.25
 #define kMaxPersonSpeed 1.25
 #define kMaxSoldierSpeed .75
 #define KPersonCount 300
-#define kZombieCount 10
+#define kZombieCount 0
 #define kSoldierCount 3
 #define kScale .5
+#define kMaxPeople 300
+#define kMaxZombies 100
 
 @interface GameLayer ()
 @property(nonatomic, strong) NSMutableArray *people;
@@ -33,6 +34,14 @@
 @property(nonatomic, strong) CCLabelTTF *zombieLabel;
 @property(nonatomic, strong) CCLabelTTF *personLabel;
 @property(nonatomic, strong) CCLabelTTF *soldierLabel;
+
+@property(nonatomic) float peopleTicker;
+@property(nonatomic) float peopleFrequencyInSeconds;
+@property(nonatomic) float zombieTicker;
+@property(nonatomic) float zombieFrequencyInSeconds;
+@property(nonatomic) float zombieSpeed;
+@property(nonatomic) NSInteger killsUntilNextWave;
+@property(nonatomic) NSInteger waveKillCount;
 
 @end
 
@@ -67,6 +76,10 @@
     
 	if( (self=[super init]) ) {
         
+        // initial config
+        self.zombieSpeed = 1.25;
+        self.killsUntilNextWave = 20;
+        
         self.people = [NSMutableArray array];
         self.zombies = [NSMutableArray array];
         self.soldiers = [NSMutableArray array];
@@ -88,7 +101,7 @@
             zombie.scale = kScale;
             zombie.people = self.people;
             zombie.position = CGPointMake(arc4random() % (NSInteger)winSize.width, arc4random() % (NSInteger)winSize.height);
-            zombie.maxSpeed = kMaxZombieSpeed;
+            zombie.maxSpeed = self.zombieSpeed;
             zombie.soldiers = self.soldiers;
         }
         
@@ -144,6 +157,9 @@
         self.soldierLabel.anchorPoint = ccp(0,0);
         [self addChild:self.soldierLabel z:5];
         
+        // init
+        self.peopleFrequencyInSeconds = 5;
+        self.zombieFrequencyInSeconds = 5;
 	}
 	return self;
 }
@@ -158,6 +174,7 @@
         {
             [deadZombies addObject:zombie];
             [self removeChild:zombie cleanup:NO];
+            self.waveKillCount++;
         }
         zombie.people = self.people;
         zombie.soldiers = self.soldiers;
@@ -202,7 +219,7 @@
         zombie.position = turnedPerson.position;
         zombie.scale = kScale;
         zombie.people = self.people;
-        zombie.maxSpeed = kMaxZombieSpeed;
+        zombie.maxSpeed = self.zombieSpeed;
         zombie.otherBoids = self.zombies;
         zombie.soldiers = self.soldiers;
         [self.zombies addObject:zombie];
@@ -220,9 +237,159 @@
         [self endWithWin:NO];
     }
     
-    if([self.zombies count] == 0)
+//    if([self.zombies count] == 0)
+//    {
+//        [self endWithWin:YES];
+//    }
+    [self checkPeople:dt];
+    [self checkZombies:dt];
+    [self nextWave];
+}
+
+- (void) checkPeople:(ccTime) dt
+{
+    self.peopleTicker += dt;
+    if(self.peopleTicker > self.peopleFrequencyInSeconds)
     {
-        [self endWithWin:YES];
+        if(self.people.count >= kMaxPeople) return;
+        // Spawn a new person
+        self.peopleTicker = 0;
+        
+        CGSize winSize = [[CCDirector sharedDirector] winSize];
+        Person *person = [[Person alloc] initWithFile:@"green.png"];        
+        person.scale = kScale;
+        if(arc4random() %2 == 0)
+        {
+            // left
+            if(arc4random() %2 == 0)
+            {
+                person.position = CGPointMake(1,arc4random() % (NSInteger)winSize.height);
+            }
+            else
+            // right
+            {
+                person.position = CGPointMake((NSInteger)winSize.width-1, arc4random() % (NSInteger)winSize.height);
+            }
+        }
+        else
+        {
+            // top
+            if(arc4random() %2 == 0)
+            {
+                person.position = CGPointMake(arc4random() % (NSInteger)winSize.width, 1);
+            }
+            else
+            // bottom
+            {
+                person.position = CGPointMake(arc4random() % (NSInteger)winSize.width, winSize.height-1);
+            }
+        }
+        person.maxSpeed = kMaxPersonSpeed;
+        person.zombies = self.zombies;
+        person.otherBoids = self.zombies;
+        person.separationDistance = 25;
+        [self addChild:person];
+        [self.people addObject:person];
+    }
+}
+
+- (void) checkZombies:(ccTime)dt
+{
+    self.zombieTicker += dt;
+    if(self.zombieTicker > self.zombieFrequencyInSeconds)
+    {
+        if(self.zombies.count >= kMaxZombies) return;
+        
+        CGSize winSize = [[CCDirector sharedDirector] winSize];
+        self.zombieTicker = 0;
+        Zombie *zombie = [[Zombie alloc] initWithFile:@"red.png"];        
+        zombie.scale = kScale;
+        
+        if(arc4random() %2 == 0)
+        {
+            // left
+            if(arc4random() %2 == 0)
+            {
+                zombie.position = CGPointMake(1,arc4random() % (NSInteger)winSize.height);
+            }
+            else
+            // right
+            {
+                zombie.position = CGPointMake((NSInteger)winSize.width-1, arc4random() % (NSInteger)winSize.height);
+            }
+        }
+        else
+        {
+            // top
+            if(arc4random() %2 == 0)
+            {
+                zombie.position = CGPointMake(arc4random() % (NSInteger)winSize.width, 1);
+            }
+            else
+            // bottom
+            {
+                zombie.position = CGPointMake(arc4random() % (NSInteger)winSize.width, winSize.height-1);
+            }
+        }
+        zombie.maxSpeed = self.zombieSpeed;
+        zombie.soldiers = self.soldiers;
+        zombie.otherBoids = self.zombies;
+        zombie.people = self.people;
+        [self.zombies addObject:zombie];
+        [self addChild:zombie];
+    }
+}
+
+- (void) nextWave
+{
+    if(self.waveKillCount < self.killsUntilNextWave || self.zombies.count > 0)
+    {
+        return;
+    }
+    
+    NSLog(@"next wave");
+    self.waveKillCount = 0;
+    // increase difficulty
+    self.zombieSpeed += .05;
+    
+    while(self.people.count < kMaxPeople)
+    {
+        // Add more people
+        CGSize winSize = [[CCDirector sharedDirector] winSize];
+        Person *person = [[Person alloc] initWithFile:@"green.png"];
+        person.scale = kScale;
+        if(arc4random() %2 == 0)
+        {
+            // left
+            if(arc4random() %2 == 0)
+            {
+                person.position = CGPointMake(1,arc4random() % (NSInteger)winSize.height);
+            }
+            else
+                // right
+            {
+                person.position = CGPointMake((NSInteger)winSize.width-1, arc4random() % (NSInteger)winSize.height);
+            }
+        }
+        else
+        {
+            // top
+            if(arc4random() %2 == 0)
+            {
+                person.position = CGPointMake(arc4random() % (NSInteger)winSize.width, 1);
+            }
+            else
+                // bottom
+            {
+                person.position = CGPointMake(arc4random() % (NSInteger)winSize.width, winSize.height-1);
+            }
+        }
+        person.maxSpeed = kMaxPersonSpeed;
+        person.zombies = self.zombies;
+        person.otherBoids = self.zombies;
+        person.separationDistance = 25;
+        [self addChild:person];
+        [self.people addObject:person];
     }
 }
 
